@@ -1,0 +1,21 @@
+// Enrich failed-logon events with geographic data from the GeoIP watchlist,
+// then aggregate by location to drive the Sentinel Workbook attack map.
+//
+// The "geoip" watchlist maps IP ranges -> network, latitude, longitude,
+// cityname, countryname (~55K rows uploaded into Sentinel).
+
+let GeoIPDB = _GetWatchlist("geoip");
+SecurityEvent
+| where EventID == 4625
+| evaluate ipv4_lookup(GeoIPDB, IpAddress, network)
+| project
+    TimeGenerated, Computer,
+    AttackerIP       = IpAddress,
+    City             = cityname,
+    Country          = countryname,
+    Latitude         = latitude,
+    Longitude        = longitude,
+    FriendlyLocation = strcat(cityname, " (", countryname, ")")
+| summarize FailedAttempts = count()
+    by AttackerIP, City, Country, FriendlyLocation, Latitude, Longitude
+| sort by FailedAttempts desc

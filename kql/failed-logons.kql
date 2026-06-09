@@ -1,0 +1,18 @@
+// Failed logon attempts against the honeypot (Windows Security Event ID 4625).
+// 4625 = "An account failed to log on."
+SecurityEvent
+| where EventID == 4625
+| project TimeGenerated, Computer, AttackerIP = IpAddress, Account, Activity
+| sort by TimeGenerated desc
+
+// Count failed attempts per source IP (who is hammering the host hardest):
+SecurityEvent
+| where EventID == 4625
+| summarize FailedAttempts = count() by IpAddress
+| sort by FailedAttempts desc
+
+// Only the last 5 minutes of activity (live-fire view):
+SecurityEvent
+| where EventID == 4625
+| where TimeGenerated > ago(5m)
+| project TimeGenerated, Computer, AttackerIP = IpAddress, Account

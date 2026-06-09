@@ -1,0 +1,10 @@
+# Raw data files (GeoIP watchlist etc.) — large and not redistributed here
+*.csv
+
+# OS / editor cruft
+.DS_Store
+Thumbs.db
+desktop.ini
+*.swp
+.vscode/
+.idea/
