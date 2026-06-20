@@ -1,34 +1,26 @@
-# Azure Cloud SOC — Microsoft Sentinel Honeynet & Live Attack Map
+# Azure SOC Honeynet with Microsoft Sentinel
 
-A hands-on Security Operations lab built in Microsoft Azure: I stood up an intentionally
-exposed Windows honeypot on the public internet, forwarded its security logs into a
-**Microsoft Sentinel** SIEM, hunted the resulting attacks with **KQL**, enriched them with
-**GeoIP** data, and visualized where the real-world attackers were coming from on a live
-**attack map**.
+I put a deliberately exposed Windows host on the public internet, forwarded its security logs into
+Microsoft Sentinel, and used KQL to hunt the attacks that followed. Failed logins were enriched
+with GeoIP data and plotted on a live attack map. Within about a day the honeypot had logged tens
+of thousands of failed logon attempts from around the world.
+
+Full write-up with the build, the queries, and the analysis: [REPORT.md](REPORT.md).
 
 ![Attack map of failed login attempts by geographic origin](images/attack-map.png)
 
-> Within roughly a day of being exposed, the honeypot logged **tens of thousands** of failed
-> login attempts from around the world — Belgium (12.3K), the Netherlands (12K), Poland (10.2K),
-> Vietnam, Germany, and the US — a vivid demonstration of how fast an internet-facing host is
-> discovered and brute-forced.
+> Top source regions in the sample run: Belgium (12.3K), Netherlands (12K), Poland (10.2K), plus
+> Vietnam, Germany, and the US. Almost all of it automated.
 
----
+## What it covers
 
-## What this project demonstrates
-
-- **Cloud infrastructure (Azure IaaS):** resource groups, virtual networks/subnets, network
-  security groups, and a Windows VM
-- **SIEM deployment & administration:** Microsoft Sentinel on top of a Log Analytics workspace
-- **Log pipeline engineering:** Azure Monitor Agent (AMA) + a Data Collection Rule (DCR)
-  forwarding Windows Security events into a central repository
-- **Threat hunting with KQL:** querying, filtering, projecting, and joining log data
-- **Threat-intel enrichment:** a GeoIP watchlist resolving attacker IPs to physical locations
-- **Security visualization:** a Sentinel Workbook rendering attack origins on a world map
-- **SOC fundamentals:** Windows security event analysis (Event ID **4625** — failed logon),
-  attacker behavior, and the case for defense-in-depth
-
----
+- Azure IaaS: resource group, virtual network, network security group, a Windows VM
+- Microsoft Sentinel running on a Log Analytics workspace
+- A log pipeline: Azure Monitor Agent and a Data Collection Rule forwarding Windows Security events
+- Threat hunting in KQL
+- GeoIP enrichment with a Sentinel watchlist
+- An attack-map workbook
+- Windows security event analysis, focused on Event ID 4625 (failed logon)
 
 ## Architecture
 
@@ -43,7 +35,7 @@ exposed Windows honeypot on the public internet, forwarded its security logs int
         |     +------------------------------------------------+       |
         |     |  Windows VM "honeypot"                         |       |
         |     |   - Public IP, RDP exposed                     |       |
-        |     |   - NSG: DANGER rule = Allow ANY/ANY/ANY in    |       |
+        |     |   - NSG: allow ANY/ANY/ANY inbound             |       |
         |     |   - Windows Firewall disabled (intentional)    |       |
         |     |   - Azure Monitor Agent (AMA)                  |       |
         |     +-----------------------+------------------------+       |
@@ -60,7 +52,7 @@ exposed Windows honeypot on the public internet, forwarded its security logs int
         +--------------------------------------------------------------+
 ```
 
-### Tech stack
+### Stack
 
 | Layer | Service / Tool |
 |---|---|
@@ -70,59 +62,37 @@ exposed Windows honeypot on the public internet, forwarded its security logs int
 | Log collection | Azure Monitor Agent + Data Collection Rule |
 | Log repository | Azure Log Analytics Workspace |
 | SIEM | Microsoft Sentinel |
-| Query language | KQL (Kusto Query Language) |
-| Enrichment | GeoIP watchlist (IP range → lat/long/city/country) |
-| Visualization | Azure / Sentinel Workbook |
+| Query language | KQL |
+| Enrichment | GeoIP watchlist (IP range to lat/long/city/country) |
+| Visualization | Sentinel Workbook |
 
----
+## Build
 
-## Build walkthrough
+1. Resource group, virtual network (`10.0.0.0/16`), and subnet. Nothing protecting it, on purpose.
+   ![Virtual network](images/virtual-network.png)
+2. A Windows VM with a public IP. I removed the default RDP-only inbound rule, replaced it with an
+   allow-any rule, and turned off the Windows firewall so the host would be found and attacked fast.
+   ![NSG with a permissive inbound rule](images/nsg-danger-rule.png)
+3. A Log Analytics workspace as the central store, with the Azure Monitor Agent and a Data
+   Collection Rule forwarding the VM's Windows Security events into it.
+   ![Log Analytics workspace](images/log-analytics-workspace.png)
+   ![Data collection rule](images/data-collection-rule.png)
+4. Microsoft Sentinel connected on top of the workspace, plus the full resource set.
+   ![Resource group contents](images/resource-group.png)
+5. Hunt failed logons in KQL, enrich the IPs against a GeoIP watchlist, and plot them in a workbook.
 
-### 1. Azure infrastructure
-Created a resource group, a virtual network (`10.0.0.0/16`) and subnet to host the lab.
-Note the network is deliberately bare — no DDoS protection, Azure Firewall, or private
-endpoints — to keep the honeypot reachable.
+## KQL
 
-![Virtual network](images/virtual-network.png)
-
-### 2. The honeypot VM + an intentionally wide-open firewall
-Deployed a Windows VM with a public IP, then **removed the default RDP-only inbound rule and
-replaced it with an "allow any" rule** so the host would be discovered and attacked as quickly
-as possible. The internal Windows Firewall was also disabled.
-
-![NSG with a permissive DANGER rule](images/nsg-danger-rule.png)
-
-### 3. Central logging — Log Analytics + the data collection pipeline
-Stood up a Log Analytics workspace as the central log repository, then used the Azure Monitor
-Agent and a Data Collection Rule to forward the VM's Windows **Security** events into it.
-
-![Log Analytics workspace](images/log-analytics-workspace.png)
-![Data collection rule](images/data-collection-rule.png)
-
-### 4. The SIEM and the full resource set
-Connected the workspace to Microsoft Sentinel. The complete lab — VM, public IP, NSG, NIC,
-disk, DCR, workspace, Sentinel (SecurityInsights), and the attack-map workbook:
-
-![Resource group contents](images/resource-group.png)
-
-### 5–7. Hunt, enrich, and visualize
-Queried failed logons in KQL, enriched the attacker IPs against a GeoIP watchlist, and plotted
-the results in a Sentinel Workbook (the attack map at the top of this README).
-
----
-
-## KQL used
-
-Find failed logon attempts (Windows Event ID **4625**) and project the fields that matter:
+Failed logons, Event ID 4625:
 
 ```kql
 SecurityEvent
-| where EventID == 4625                         // an account failed to log on
+| where EventID == 4625
 | project TimeGenerated, Computer, AttackerIP = IpAddress, Account, Activity
 | sort by TimeGenerated desc
 ```
 
-Enrich each attacker IP with geographic data from the GeoIP watchlist and aggregate for the map:
+Enrich each attacker IP with the GeoIP watchlist and aggregate for the map:
 
 ```kql
 let GeoIPDB = _GetWatchlist("geoip");
@@ -142,39 +112,31 @@ SecurityEvent
 | sort by FailedAttempts desc
 ```
 
----
+## What I found
 
-## Results & key findings
+- An exposed host gets attacked within minutes to hours. There was no warm-up period.
+- The volume is relentless: tens of thousands of failed logons, with single source regions past 10K.
+- The traffic is global and almost entirely automated, hitting the open RDP surface with common
+  usernames.
+- At that volume the raw event log is useless. Sentinel and KQL and a watchlist are what made the
+  pattern legible.
 
-- **Exposure is detected in minutes to hours.** Automated scanners and brute-force bots found
-  the open RDP surface almost immediately.
-- **Volume is relentless.** The map reflects **tens of thousands** of failed logon attempts,
-  with single source regions exceeding 10K attempts each.
-- **Geography is global.** Top origins included Belgium, the Netherlands, Poland, Vietnam,
-  Germany, and the United States.
-- **A SIEM turns noise into signal.** Raw Windows Event Viewer logs are unreadable at this
-  volume; Sentinel + KQL + a watchlist made the attack pattern legible and visual.
+## Next steps
 
----
+This lab stops at detection and visualization. To push it toward a real SOC:
 
-## Limitations & next steps
+- Analytic rules that turn the 4625 spike into Sentinel incidents
+- A SOAR playbook to auto-respond, for example blocking a source range
+- Re-harden the NSG to least privilege and measure the drop in noise
+- More telemetry: Sysmon and a Defender connector
+- Map the activity to MITRE ATT&CK (the brute forcing is T1110)
 
-This lab stops at detection and visualization. To grow it toward a realistic SOC:
+## Safety
 
-- **Analytic rules & incidents** — turn the 4625 spike into Sentinel alerts that auto-create
-  and triage incidents
-- **Automation (SOAR)** — playbooks to auto-respond (e.g., block source IP ranges)
-- **Harden the host** — restore least-privilege NSG rules and measure the drop in noise
-- **Broader telemetry** — Sysmon, Defender for Endpoint, and additional data connectors
-- **MITRE ATT&CK mapping** — classify observed techniques (e.g., T1110 Brute Force)
+A honeypot is insecure on purpose. I kept it isolated, watched it the whole time it was up, and
+tore it down when I was done. Do not run an allow-any host on a network you care about.
 
-> ⚠️ A honeypot is intentionally insecure. It was isolated, monitored, and torn down after the
-> exercise. Never run an "allow any" host on a network you care about.
+## Credit
 
----
-
-## Acknowledgment
-
-This is a hands-on build of the well-known Azure + Microsoft Sentinel SOC honeynet lab
-popularized by **Josh Madakor**. The architecture and lab concept are his; the deployment,
-configuration, queries, and analysis here are my own work.
+Built following Josh Madakor's Azure SOC honeynet lab. The architecture and concept are his. The
+deployment, configuration, queries, and analysis are mine.
