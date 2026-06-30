@@ -140,3 +140,7 @@ tore it down when I was done. Do not run an allow-any host on a network you care
 
 Built following Josh Madakor's Azure SOC honeynet lab. The architecture and concept are his. The
 deployment, configuration, queries, and analysis are mine.
+
+---
+
+![Tracecast LLC - custom signal engines for B2B](docs/tracecast-logo.png)
