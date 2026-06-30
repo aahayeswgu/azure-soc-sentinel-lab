@@ -32,23 +32,23 @@ Full write-up with the build, the queries, and the analysis: [REPORT.md](REPORT.
         |  Azure Subscription  >  Resource Group (RG-SOC-Lab)          |
         |                                                              |
         |   Virtual Network (10.0.0.0/16)                              |
-        |     +------------------------------------------------+       |
-        |     |  Windows VM "honeypot"                         |       |
-        |     |   - Public IP, RDP exposed                     |       |
-        |     |   - NSG: allow ANY/ANY/ANY inbound             |       |
-        |     |   - Windows Firewall disabled (intentional)    |       |
-        |     |   - Azure Monitor Agent (AMA)                  |       |
-        |     +-----------------------+------------------------+       |
-        |                             | Security event logs            |
-        |                Data Collection Rule (DCR-Windows)            |
-        |                             v                                |
-        |             Log Analytics Workspace (LAW-soc-lab)           |
-        |                             |                                |
-        |                             v                                |
-        |             Microsoft Sentinel  (SIEM)                       |
-        |               - KQL hunting (Event ID 4625)                 |
-        |               - GeoIP watchlist enrichment                  |
-        |               - Workbook: "Windows VM attack map"           |
+        |   +----------------------------------------------+           |
+        |   |  Windows VM "honeypot"                       |           |
+        |   |   - Public IP, RDP exposed                   |           |
+        |   |   - NSG: allow ANY/ANY/ANY inbound           |           |
+        |   |   - Windows Firewall disabled (intentional)  |           |
+        |   |   - Azure Monitor Agent (AMA)                |           |
+        |   +----------------------------------------------+           |
+        |                | Security event logs                         |
+        |       Data Collection Rule (DCR-Windows)                     |
+        |                v                                             |
+        |       Log Analytics Workspace (LAW-soc-lab)                  |
+        |                |                                             |
+        |                v                                             |
+        |       Microsoft Sentinel  (SIEM)                             |
+        |         - KQL hunting (Event ID 4625)                        |
+        |         - GeoIP watchlist enrichment                         |
+        |         - Workbook: "Windows VM attack map"                  |
         +--------------------------------------------------------------+
 ```
 
